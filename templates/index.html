@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ego Coder AI</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background-color: #1e1e1e; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; position: relative; }
+body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: linear-gradient(120deg, #232526 0%, #414345 100%);
+    z-index: 0;
+    opacity: 0.95;
+    pointer-events: none;
+    animation: bgMove 12s linear infinite alternate;
+}
+@keyframes bgMove {
+    0% { filter: hue-rotate(0deg) brightness(1); }
+    100% { filter: hue-rotate(60deg) brightness(1.1); }
+}
+.container, .pane, .pane-left, .pane-right { position: relative; z-index: 1; }
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        .pane {
+            min-width: 300px; /* Minimum width for panes */
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin: 10px;
+            border-radius: 8px;
+        }
+        .pane-left { margin-right: 5px; background-color: #282c34; }
+        .pane-right { margin-left: 5px; background-color: #282c34; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; min-width: 400px; max-width: 700px; box-shadow: 0 4px 32px rgba(0,0,0,0.25); transition: box-shadow 0.3s, transform 0.3s; }
+.pane-right.show { animation: slideInRight 0.5s cubic-bezier(0.4,0.2,0.2,1) both; }
+@keyframes slideInRight { from { transform: translateX(80px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.tab-container, .tab-content, #codeOutputArea, #previewTab, #codeTab { transition: all 0.3s cubic-bezier(0.4,0.2,0.2,1); }
+.tab-button { transition: background 0.2s, color 0.2s; }
+#codeOutputArea, #previewTab, #codeTab { border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.10); }
+#codeOutputArea { background: #23272e; }
+#previewTab { background: #23272e; }
+        h1 { text-align: center; color: #61afef; margin-top: 0; }
+        textarea { width: 98%; padding: 10px; margin-bottom: 10px; border: 1px solid #555; border-radius: 4px; min-height: 100px; box-sizing: border-box; background-color: #333; color: #e0e0e0; }
+        label { font-weight: bold; margin-bottom: 5px; display: block; }
+        button {
+            background-color: #61afef; color: white; padding: 10px 15px; border: none;
+            border-radius: 4px; cursor: pointer; font-size: 16px; display: block; margin: 10px auto;
+        }
+        button:hover { background-color: #528abd; 
+            background-color: #007bff; color: white; padding: 10px 15px; border: none;
+            border-radius: 4px; cursor: pointer; font-size: 16px; display: block; margin: 10px auto;
+        }
+        button:hover { background-color: #0056b3; }
+        .response { margin-top: 20px; padding: 15px; background-color: #333; border: 1px solid #555; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
+        .response h3 { margin-top: 0; }
+        .loading { text-align: center; font-style: italic; color: #555; }
+        .code-block-container { background-color: #282c34; border: 1px solid #333; border-radius: 8px; margin-bottom: 15px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.10); transition: box-shadow 0.3s; }
+        .code-header { background-color: #3c4048; padding: 8px 12px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-size: 0.9em; color: #abb2bf; }
+        .code-header button { background-color: #61afef; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 0.8em; }
+        .code-header button:hover { background-color: #528abd; }
+        .code-content { padding: 10px; overflow-x: auto; }
+        .code-content pre { margin: 0; }
+        .code-content code { display: block; padding: 0; background: none; color: #abb2bf; }
+        .code-content textarea { 
+            width: 100%; 
+            min-height: 300px; 
+            background-color: #282c34; 
+            color: #abb2bf; 
+            border: none; 
+            resize: vertical; 
+            font-family: 'Fira Code', 'Cascadia Code', monospace; 
+            padding: 10px; 
+            box-sizing: border-box;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        .code-content textarea.hljs { /* Apply highlight.js styles to textarea */
+            padding: 1em;
+            overflow: auto;
+            background: #282c34; /* Match container background */
+            color: #abb2bf;
+        }
+        /* Syntax highlighting colors for the textarea */
+        .code-content textarea::selection { background-color: rgba(97, 175, 239, 0.3); }
+        .code-content textarea.language-python { color: #98c379; }
+        .code-content textarea.language-javascript { color: #e6c07b; }
+        .code-content textarea.language-html { color: #e06c75; }
+        .code-content textarea.language-css { color: #56b6c2; }
+        .follow-up-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #555; animation: fadeIn 0.5s; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .follow-up-section textarea { min-height: 80px; }
+        .follow-up-section button { margin-top: 10px; }
+        .tab-container { display: flex; border-bottom: 1px solid #333; margin-bottom: 0; align-items: flex-end; }
+        .tab-button { background-color: #3c4048; color: #abb2bf; padding: 10px 15px; border: none; cursor: pointer; border-top-left-radius: 4px; border-top-right-radius: 4px; margin-right: 2px; outline: none; user-select: none; z-index: 2; position: relative; transition: background 0.2s, color 0.2s, transform 0.2s; }
+.tab-button.active { background-color: #282c34; color: #61afef; transform: scale(1.08); box-shadow: 0 2px 8px rgba(97,175,239,0.15); }
+.tab-button:active { transform: scale(0.97); }
+        .tab-content { padding: 15px; border: 1px solid #333; border-top: none; border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; background-color: #282c34; min-height: 200px; display: flex; flex-direction: column; justify-content: flex-start; }
+        .preview-iframe { width: 100%; height: 400px; border: none; background-color: white; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.10); transition: box-shadow 0.3s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="pane pane-left">
+            <h1>Ego Coder AI Assistant</h1>
+            <form id="aiForm">
+                <label for="user_query">Your Request (e.g., "Explain this Python code", "Generate a Javascript function to...", "Help me learn about ...."):</label>
+                <textarea id="user_query" name="user_query" rows="5" required placeholder="Tell me what you need..."></textarea>
+
+                <label for="code_snippet">Code Snippet (Optional - if your request involves existing code):</label>
+                <textarea id="code_snippet" name="code_snippet" rows="10" placeholder="Paste your code here..."></textarea>
+
+                <button type="submit">Ask Ego AI</button>
+            </form>
+
+            <div id="loading" class="loading" style="display:none;">
+                Ego AI is thinking... (this might take a moment, especially for the first request to a model)
+            </div>
+
+            <div id="responseArea" class="response" style="display:none;">
+                <h3>Ego Response:</h3>
+                <div id="aiResponseContent"></div>
+                <div id="aiCodeExplanation" style="margin-top:20px; display:none; background:#23272e; border-radius:8px; padding:15px; border:1px solid #333; box-shadow:0 2px 12px rgba(0,0,0,0.10); animation: fadeIn 0.5s;">
+                    <h4 style="color:#61afef; margin-top:0;">Code Explanation</h4>
+                    <div id="aiCodeExplanationContent"></div>
+                </div>
+            </div>
+        </div>
+        <div class="pane pane-right" style="display:none;"> <!-- Hide right pane by defauOlt -->            <h1>Generated Code</h1>
+            <div class="tab-container">
+                <button type="button" class="tab-button active" id="codeTabButton">Code</button>
+                <button type="button" class="tab-button" id="previewTabButton" style="display:none;">Preview</button>
+            </div>
+            <div id="codeTab" class="tab-content" style="display:block;">
+                <div id="codeOutputArea" class="response">
+                    <div id="codeOutputContent"></div>
+                    <div id="followUpSection" class="follow-up-section" style="display:none;">
+                        <label for="follow_up_query">Ask follow up question or request changes:</label>
+                        <textarea id="follow_up_query" rows="4" placeholder="e.g., 'Change this to Python 3.9', 'Add comments to the function', 'Refactor this loop'" style="width: 98%;"></textarea>
+                        <button type="button" id="sendFollowUp">Send Follow Up</button>
+                    </div>
+                </div>
+            </div>
+            <div id="previewTab" class="tab-content" style="display:none;">
+                <iframe id="previewIframe" class="preview-iframe"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/css.min.js"></script>
+    <script>
+        // Function to detect language from code block (simple heuristic)
+        function detectLanguage(code) {
+            if (code.includes('import') && code.includes('def')) return 'python';
+            if (code.includes('function') || code.includes('const') || code.includes('let')) return 'javascript';
+            if (code.includes('<html') || code.includes('<body')) return 'html';
+            if (code.includes('{') && code.includes(';')) return 'css';
+            return 'plaintext';
+        }
+
+        function renderCodeBlock(codeBlockText, targetElement) {
+            const lines = codeBlockText.split('\n');
+            let lang = 'plaintext';
+            let code = '';
+
+            if (lines.length > 1) {
+                const firstLine = lines[0];
+                const langMatch = firstLine.match(/```([a-zA-Z]+)/);
+                if (langMatch && langMatch[1]) {
+                    lang = langMatch[1];
+                    code = lines.slice(1, -1).join('\n');
+                } else {
+                    code = lines.slice(1, -1).join('\n');
+                    lang = detectLanguage(code); // Try to detect if no language specified
+                }
+            }
+
+            const codeContainer = document.createElement('div');
+            codeContainer.className = 'code-block-container';
+
+            const codeHeader = document.createElement('div');
+            codeHeader.className = 'code-header';
+            codeHeader.innerHTML = `<span>${lang.toUpperCase()}</span><button onclick="copyCode(this)">Copy</button>`;
+            codeContainer.appendChild(codeHeader);
+
+            const codeContent = document.createElement('div');
+            codeContent.className = 'code-content';
+
+            const codeEditor = document.createElement('textarea');
+            codeEditor.className = `language-${lang} hljs`; // Add hljs class for styling
+            codeEditor.value = code;
+            codeEditor.setAttribute('spellcheck', 'false'); // Disable spellcheck
+            codeEditor.setAttribute('data-language', lang); // Store language for potential future use
+
+            codeContent.appendChild(codeEditor);
+            codeContainer.appendChild(codeContent);
+
+            targetElement.appendChild(codeContainer);
+
+            // Apply highlighting to the textarea content
+            const highlightedCode = hljs.highlight(code, {language: lang}).value;
+            // For a textarea, we can't directly apply syntax highlighting that stays editable.
+            // A common workaround is to use a contenteditable div or a dedicated editor library.
+            // For now, we'll just set the value and rely on the dark background and font.
+            // If true syntax highlighting with editing is required, a more complex solution is needed.
+
+            // Optional: Re-apply highlighting if the user stops typing (debounce)
+            let typingTimer;
+            const doneTypingInterval = 1000; // 1 second
+            codeEditor.addEventListener('keyup', () => {
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(() => {
+                    // This part would re-highlight if we were using a contenteditable div or a more advanced editor
+                    // For a textarea, direct highlighting is not standard.
+                    // If we want to show syntax highlighting, we'd need to render it in a non-editable way
+                    // or use a library like CodeMirror/Monaco.
+                }, doneTypingInterval);
+            });
+        }
+
+        function copyCode(button) {
+            const codeBlock = button.closest('.code-block-container').querySelector('.code-content textarea').value;
+            navigator.clipboard.writeText(codeBlock).then(() => {
+                button.textContent = 'Copied!';
+                setTimeout(() => { button.textContent = 'Copy'; }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy code: ', err);
+            });
+        }
+
+        // Tab switching logic for code/preview
+        document.getElementById('codeTabButton').addEventListener('click', function() {
+            document.getElementById('codeTab').style.display = 'block';
+            document.getElementById('previewTab').style.display = 'none';
+            this.classList.add('active');
+            document.getElementById('previewTabButton').classList.remove('active');
+        });
+        document.getElementById('previewTabButton').addEventListener('click', function() {
+            document.getElementById('codeTab').style.display = 'none';
+            document.getElementById('previewTab').style.display = 'block';
+            this.classList.add('active');
+            document.getElementById('codeTabButton').classList.remove('active');
+        });
+
+        document.getElementById('sendFollowUp').addEventListener('click', async function() {
+            const followUpQuery = document.getElementById('follow_up_query').value;
+            const currentCode = document.getElementById('codeOutputContent').querySelector('textarea').value;
+            const currentLanguage = document.getElementById('codeOutputContent').querySelector('textarea').getAttribute('data-language');
+
+            if (!followUpQuery.trim()) {
+                alert('Please enter a follow-up question or change request.');
+                return;
+            }
+
+            // Clear previous responses and show loading
+            const aiResponseContent = document.getElementById('aiResponseContent');
+            const loadingIndicator = document.getElementById('loading');
+            aiResponseContent.innerHTML = '';
+            loadingIndicator.style.display = 'block';
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_query: followUpQuery,
+                        code_snippet: currentCode, // Send the current code for modification
+                        language: currentLanguage // Send the language for context
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const responseText = data.response;
+
+                // Assuming the AI will return the updated code in a code block
+                const parts = responseText.split(/(```[a-zA-Z]*\n[\s\S]*?\n```)/g);
+                let updatedCode = '';
+                let explanationText = '';
+
+                parts.forEach(part => {
+                    if (part.startsWith('```') && part.endsWith('```')) {
+                        const lines = part.split('\n');
+                        updatedCode = lines.slice(1, -1).join('\n');
+                    } else {
+                        explanationText += part;
+                    }
+                });
+
+                if (updatedCode) {
+                    // Update the existing textarea with the new code
+                    document.getElementById('codeOutputContent').querySelector('textarea').value = updatedCode;
+                    // Re-highlight if necessary (though textarea doesn't truly highlight)
+                    // hljs.highlightElement(document.getElementById('codeOutputContent').querySelector('textarea'));
+                }
+
+                if (explanationText) {
+                    aiResponseContent.innerHTML = `<p>${explanationText}</p>`;
+                    responseArea.style.display = 'block';
+                } else {
+                    responseArea.style.display = 'none';
+                }
+
+            } catch (error) {
+                aiResponseContent.innerHTML = `<strong style='color:red;'>Error:</strong> ${error.message}`;
+                responseArea.style.display = 'block';
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        });
+
+        // Tab switching logic for code/preview
+        document.getElementById('codeTabButton').addEventListener('click', function() {
+            document.getElementById('codeTab').style.display = 'block';
+            document.getElementById('previewTab').style.display = 'none';
+            this.classList.add('active');
+            document.getElementById('previewTabButton').classList.remove('active');
+        });
+        document.getElementById('previewTabButton').addEventListener('click', function() {
+            document.getElementById('codeTab').style.display = 'none';
+            document.getElementById('previewTab').style.display = 'block';
+            this.classList.add('active');
+            document.getElementById('codeTabButton').classList.remove('active');
+        });
+
+        document.getElementById('aiForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const userQuery = document.getElementById('user_query').value;
+            const codeSnippet = document.getElementById('code_snippet').value;
+            const aiResponseContent = document.getElementById('aiResponseContent');
+            const codeOutputContent = document.getElementById('codeOutputContent');
+            const loadingIndicator = document.getElementById('loading');
+            const paneRight = document.querySelector('.pane-right'); // Get the right pane
+            const responseArea = document.getElementById('responseArea');
+            const followUpSection = document.getElementById('followUpSection');
+            const previewTabButton = document.getElementById('previewTabButton');
+            const previewIframe = document.getElementById('previewIframe');
+
+            // Analyze if the query is likely requesting code generation
+            const isCodeGenerationQuery = userQuery.toLowerCase().includes('generate') || 
+                                        userQuery.toLowerCase().includes('create') || 
+                                        userQuery.toLowerCase().includes('write') || 
+                                        userQuery.toLowerCase().includes('code') || 
+                                        userQuery.toLowerCase().includes('function') || 
+                                        userQuery.toLowerCase().includes('script') || 
+                                        userQuery.toLowerCase().includes('program');
+
+            // Hide panes and clear content initially
+            aiResponseContent.innerHTML = '';
+            codeOutputContent.innerHTML = '';
+            responseArea.style.display = 'none';
+            paneRight.style.display = 'none'; // Hide right pane by default
+            followUpSection.style.display = 'none';
+
+            // Hide preview tab button and clear iframe content
+            if (previewTabButton) previewTabButton.style.display = 'none';
+            if (previewIframe) previewIframe.srcdoc = '';
+
+            loadingIndicator.style.display = 'block';
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_query: userQuery,
+                        code_snippet: codeSnippet
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const responseText = data.response;
+
+                let hasCode = false;
+                let hasText = false;
+                let isHtmlCode = false;
+
+                // Split the response into parts based on code blocks
+                const parts = responseText.split(/(```[a-zA-Z]*\n[\s\S]*?\n```)/g);
+
+                codeOutputContent.innerHTML = ''; // Clear previous code output
+
+                parts.forEach(part => {
+                    if (part.startsWith('```') && part.endsWith('```')) {
+                        hasCode = true;
+                        renderCodeBlock(part, codeOutputContent);
+                        if (part.includes('<html') || part.includes('<body') || part.includes('<div')) {
+                            isHtmlCode = true;
+                        }
+                    } else if (part.trim().length > 0) {
+                        hasText = true;
+                        aiResponseContent.innerHTML += `<p>${part.trim()}</p>`;
+                    }
+                });
+
+                // Conditional display of panes and content
+                if (hasText) {
+                    responseArea.style.display = 'block';
+                } else {
+                    responseArea.style.display = 'none';
+                }
+
+                if (hasCode || isCodeGenerationQuery) {
+                    paneRight.style.display = 'flex';
+                    paneRight.classList.add('show');
+                    followUpSection.style.display = hasCode ? 'block' : 'none';
+
+                    // Handle Preview tab for HTML
+                    if (isHtmlCode) {
+                        previewTabButton.style.display = 'block';
+                        const codeToPreview = codeOutputContent.querySelector('textarea')?.value || '';
+                        previewIframe.srcdoc = codeToPreview;
+                    } else {
+                        previewTabButton.style.display = 'none';
+                    }
+
+                    // Show code explanation in left pane if present
+                    const explanationDiv = document.getElementById('aiCodeExplanation');
+                    const explanationContent = document.getElementById('aiCodeExplanationContent');
+                    let explanationText = '';
+                    parts.forEach(part => {
+                        if (!(part.startsWith('```') && part.endsWith('```')) && part.trim().length > 0) {
+                            explanationText += part.trim() + '\n';
+                        }
+                    });
+                    if (explanationText.trim().length > 0) {
+                        // Convert explanationText to a numbered list for clarity
+                        const points = explanationText.split(/\n|\r/).filter(line => line.trim().length > 0);
+                        if (points.length > 1) {
+                            let listHtml = '<ol style="margin-left:20px;">';
+                            points.forEach(pt => {
+                                // Remove leading * or - or numbers
+                                let clean = pt.replace(/^\s*[*\-\d.]+\s*/, '');
+                                listHtml += `<li>${clean}</li>`;
+                            });
+                            listHtml += '</ol>';
+                            explanationContent.innerHTML = listHtml;
+                        } else {
+                            explanationContent.innerHTML = `<p>${explanationText.replace(/\n/g, '<br>')}</p>`;
+                        }
+                        explanationDiv.style.display = 'block';
+                    } else {
+                        explanationDiv.style.display = 'none';
+                    }
+                } else {
+                    paneRight.style.display = 'none';
+                    paneRight.classList.remove('show');
+                    document.getElementById('aiCodeExplanation').style.display = 'none';
+                }
+
+                // If there's no text but there is code, ensure the left pane is still visible
+                // and the right pane is shown.
+                if (!hasText && hasCode) {
+                    paneRight.style.display = 'block';
+                }
+
+                // If there's an error or no response, ensure both panes are hidden or show error appropriately
+                if (!hasText && !hasCode && responseText.trim().length === 0) {
+                    paneRight.style.display = 'none';
+                    responseArea.style.display = 'none';
+                }
+
+            } catch (error) {
+                aiResponseContent.innerHTML = `<strong style='color:red;'>Error:</strong> ${error.message}`;
+                responseArea.style.display = 'block';
+                paneRight.style.display = 'none'; // Hide right pane on error
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+
+
+            followUpSection.style.display = 'none'; // Hide follow up section by default
+            loadingIndicator.style.display = 'block';
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_query: userQuery,
+                        code_snippet: codeSnippet
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const responseText = data.response;
+
+                const parts = responseText.split(/(```[a-zA-Z]*\n[\s\S]*?\n```)/g);
+                let hasCode = false;
+                let textParts = [];
+                let codeParts = [];
+
+                parts.forEach(part => {
+                    if (part.startsWith('```') && part.endsWith('```')) {
+                        hasCode = true;
+                        codeParts.push(part);
+                    } else {
+                        textParts.push(part);
+                    }
+                });
+
+                if (hasCode) {
+                    // Render text in left pane
+                    if (textParts.length > 0) {
+                        aiResponseContent.innerHTML = textParts.map(p => `<p>${p}</p>`).join('');
+                        responseArea.style.display = 'block';
+                    } else {
+                        responseArea.style.display = 'none'; // Hide left pane if no text
+                    }
+                    // Render code in right pane
+                    codeOutputContent.innerHTML = ''; // Clear previous code content
+                    codeParts.forEach(codePart => renderCodeBlock(codePart, codeOutputContent));
+                    codeOutputArea.style.display = 'block';
+                    paneRight.style.display = 'flex'; // Show right pane if code is generated
+
+                    // Check if any code block is HTML for preview
+                    const isHtmlCode = codeParts.some(codePart => {
+                        const lines = codePart.split('\n');
+                        if (lines.length > 1) {
+                            const firstLine = lines[0];
+                            const langMatch = firstLine.match(/```([a-zA-Z]+)/);
+                            return langMatch && langMatch[1] && langMatch[1].toLowerCase() === 'html';
+                        }
+                        return false;
+                    });
+
+                    if (isHtmlCode) {
+                        previewTabButton.style.display = 'block';
+                        // For simplicity, we'll just take the first HTML block for preview
+                        const htmlCodeBlock = codeParts.find(codePart => {
+                            const lines = codePart.split('\n');
+                            if (lines.length > 1) {
+                                const firstLine = lines[0];
+                                const langMatch = firstLine.match(/```([a-zA-Z]+)/);
+                                return langMatch && langMatch[1] && langMatch[1].toLowerCase() === 'html';
+                            }
+                            return false;
+                        });
+                        if (htmlCodeBlock) {
+                            const lines = htmlCodeBlock.split('\n');
+                            const htmlContent = lines.slice(1, -1).join('\n');
+                            previewIframe.srcdoc = htmlContent;
+                        }
+                    } else {
+                        previewTabButton.style.display = 'none';
+                    }
+                    followUpSection.style.display = 'block'; // Show follow up section if code is generated
+
+                } else {
+                    // If no code, render everything in the left pane and hide right pane
+                    aiResponseContent.innerHTML = `<p>${responseText}</p>`;
+                    responseArea.style.display = 'block';
+                    codeOutputArea.style.display = 'none';
+                    paneRight.style.display = 'none'; // Ensure right pane is hidden if no code
+                    followUpSection.style.display = 'none'; // Hide follow up section if no code
+                }
+
+            } catch (error) {
+                document.getElementById('aiResponseContent').innerHTML = `<strong style='color:red;'>Error:</strong> ${error.message}`;
+                responseArea.style.display = 'block';
+                codeOutputArea.style.display = 'none';
+                paneRight.style.display = 'none'; // Ensure right pane is hidden on error
+                followUpSection.style.display = 'none'; // Hide follow up section on error
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
